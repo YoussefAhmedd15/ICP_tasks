@@ -1,4 +1,4 @@
-use candid::{CandidType, Deserialize};
+use candid::{CandidType, Deserialize, Principal};
 use std::collections::HashMap;
 
 #[derive(CandidType, Deserialize, Clone)]
@@ -8,16 +8,16 @@ pub struct Note {
     pub content: String,
 }
 
-
-static mut NOTES: Option<HashMap<u64, Note>> = None;
+// Store notes per user (Principal)
+static mut USER_NOTES: Option<HashMap<Principal, HashMap<u64, Note>>> = None;
 static mut NEXT_ID: u64 = 1;
 
-fn get_notes() -> &'static mut HashMap<u64, Note> {
+fn get_user_notes() -> &'static mut HashMap<Principal, HashMap<u64, Note>> {
     unsafe {
-        if NOTES.is_none() {
-            NOTES = Some(HashMap::new());
+        if USER_NOTES.is_none() {
+            USER_NOTES = Some(HashMap::new());
         }
-        NOTES.as_mut().unwrap()
+        USER_NOTES.as_mut().unwrap()
     }
 }
 
@@ -29,37 +29,67 @@ fn get_next_id() -> u64 {
     }
 }
 
+// Helper function to get the caller's principal
+fn caller() -> Principal {
+    ic_cdk::api::caller()
+}
+
 #[ic_cdk::query]
 fn get_all_notes() -> Vec<Note> {
-    let notes = get_notes();
-    notes.values().cloned().collect()
+    let user_principal = caller();
+    let user_notes_map = get_user_notes();
+    
+    if let Some(user_notes) = user_notes_map.get(&user_principal) {
+        user_notes.values().cloned().collect()
+    } else {
+        Vec::new()
+    }
 }
 
 #[ic_cdk::update]
 fn create_note(title: String, content: String) -> Note {
+    let user_principal = caller();
     let id = get_next_id();
     let note = Note { id, title, content };
-    let notes = get_notes();
-    notes.insert(id, note.clone());
+    
+    let user_notes_map = get_user_notes();
+    let user_notes = user_notes_map.entry(user_principal).or_insert_with(HashMap::new);
+    user_notes.insert(id, note.clone());
+    
     note
 }
 
 #[ic_cdk::update]
 fn update_note(id: u64, title: String, content: String) -> Option<Note> {
-    let notes = get_notes();
-    if let Some(note) = notes.get_mut(&id) {
-        note.title = title;
-        note.content = content;
-        Some(note.clone())
-    } else {
-        None
+    let user_principal = caller();
+    let user_notes_map = get_user_notes();
+    
+    if let Some(user_notes) = user_notes_map.get_mut(&user_principal) {
+        if let Some(note) = user_notes.get_mut(&id) {
+            note.title = title;
+            note.content = content;
+            return Some(note.clone());
+        }
     }
+    None
 }
 
 #[ic_cdk::update]
 fn delete_note(id: u64) -> bool {
-    let notes = get_notes();
-    notes.remove(&id).is_some()
+    let user_principal = caller();
+    let user_notes_map = get_user_notes();
+    
+    if let Some(user_notes) = user_notes_map.get_mut(&user_principal) {
+        user_notes.remove(&id).is_some()
+    } else {
+        false
+    }
+}
+
+// New function to get the current user's principal
+#[ic_cdk::query]
+fn whoami() -> Principal {
+    caller()
 }
 
 candid::export_service!();

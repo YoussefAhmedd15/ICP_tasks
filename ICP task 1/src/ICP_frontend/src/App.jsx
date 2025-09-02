@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
 import { ICP_backend } from 'declarations/ICP_backend';
+import { useAuth } from './AuthContext';
 import './App.css';
 
 function App() {
+  const { isAuthenticated, principal, login, logout, isLoading } = useAuth();
   const [notes, setNotes] = useState([]);
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
@@ -73,13 +75,47 @@ function App() {
   };
 
   useEffect(() => {
-    loadNotes();
-  }, []);
+    if (isAuthenticated) {
+      loadNotes();
+    } else {
+      setNotes([]);
+    }
+  }, [isAuthenticated]);
+
+  if (isLoading) {
+    return (
+      <div className="app">
+        <div className="loading">Loading...</div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <div className="app">
+        <h1>📝 Note Taking dApp</h1>
+        <div className="auth-container">
+          <h2>Welcome to Your Secure Note-Taking App</h2>
+          <p>Please authenticate with Internet Identity to access your notes.</p>
+          <button onClick={login} className="login-button">
+            🔐 Login with Internet Identity
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="app">
-      <h1>📝 Note Taking dApp</h1>
-      
+      <div className="header">
+        <h1>📝 Note Taking dApp</h1>
+        <div className="user-info">
+          <span className="principal">User: {principal}</span>
+          <button onClick={logout} className="logout-button">
+            Logout
+          </button>
+        </div>
+      </div>
       
       <div className="form-container">
         <h2>{editingId ? 'Edit Note' : 'Create New Note'}</h2>

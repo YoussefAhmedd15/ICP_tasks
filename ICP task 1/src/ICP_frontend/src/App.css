@@ -125,3 +125,99 @@ button:active {
 .note-actions button:last-child:hover {
   background-color: #c0392b;
 }
+
+/* Authentication Styles */
+.loading {
+  text-align: center;
+  padding: 50px;
+  font-size: 18px;
+  color: #666;
+}
+
+.auth-container {
+  background: white;
+  padding: 40px;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+  text-align: center;
+  max-width: 500px;
+  margin: 0 auto;
+}
+
+.auth-container h2 {
+  margin-bottom: 15px;
+  color: #2c3e50;
+}
+
+.auth-container p {
+  margin-bottom: 30px;
+  color: #666;
+  line-height: 1.5;
+}
+
+.login-button {
+  background-color: #27ae60;
+  font-size: 18px;
+  padding: 15px 30px;
+  border-radius: 6px;
+  transition: all 0.3s ease;
+}
+
+.login-button:hover {
+  background-color: #229954;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(39, 174, 96, 0.3);
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 30px;
+  flex-wrap: wrap;
+  gap: 20px;
+}
+
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  flex-wrap: wrap;
+}
+
+.principal {
+  background-color: #ecf0f1;
+  padding: 8px 12px;
+  border-radius: 4px;
+  font-family: monospace;
+  font-size: 14px;
+  color: #2c3e50;
+  word-break: break-all;
+}
+
+.logout-button {
+  background-color: #e74c3c;
+  padding: 8px 16px;
+  font-size: 14px;
+}
+
+.logout-button:hover {
+  background-color: #c0392b;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .header {
+    flex-direction: column;
+    text-align: center;
+  }
+  
+  .user-info {
+    justify-content: center;
+  }
+  
+  .principal {
+    font-size: 12px;
+    max-width: 200px;
+  }
+}

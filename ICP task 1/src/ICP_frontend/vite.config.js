@@ -9,6 +9,9 @@ dotenv.config({ path: '../../.env' });
 export default defineConfig({
   build: {
     emptyOutDir: true,
+    rollupOptions: {
+      external: [],
+    },
   },
   optimizeDeps: {
     esbuildOptions: {
@@ -16,6 +19,7 @@ export default defineConfig({
         global: "globalThis",
       },
     },
+    include: ['@dfinity/auth-client', '@dfinity/agent', '@dfinity/principal'],
   },
   server: {
     proxy: {
@@ -39,6 +43,6 @@ export default defineConfig({
         ),
       },
     ],
-    dedupe: ['@dfinity/agent'],
+    dedupe: ['@dfinity/agent', '@dfinity/auth-client', '@dfinity/principal'],
   },
 });

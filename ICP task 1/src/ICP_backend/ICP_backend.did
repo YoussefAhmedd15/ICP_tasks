@@ -9,4 +9,5 @@ service : {
     "create_note" : (text, text) -> (Note);
     "update_note" : (nat64, text, text) -> (opt Note);
     "delete_note" : (nat64) -> (bool);
+    "whoami" : () -> (principal) query;
 };
