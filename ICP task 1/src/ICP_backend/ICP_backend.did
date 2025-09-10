@@ -4,10 +4,16 @@ type Note = record {
     content : text;
 };
 
+type Result = variant { Ok; Err : text };
+
 service : {
     "get_all_notes" : () -> (vec Note) query;
     "create_note" : (text, text) -> (Note);
     "update_note" : (nat64, text, text) -> (opt Note);
     "delete_note" : (nat64) -> (bool);
     "whoami" : () -> (principal) query;
+    "balance_of" : (principal) -> (nat) query;
+    "my_balance" : () -> (nat) query;
+    "transfer" : (principal, nat) -> (Result);
+    "mint_to" : (principal, nat) -> (Result);
 };

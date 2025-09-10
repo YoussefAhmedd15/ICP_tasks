@@ -4,6 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "dev": "vite --port 3000",
     "setup": "npm i && dfx canister create ICP_backend && dfx generate ICP_backend && dfx deploy",
     "start": "vite --port 3000",
     "prebuild": "dfx generate",

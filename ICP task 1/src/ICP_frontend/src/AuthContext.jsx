@@ -46,6 +46,7 @@ export const AuthProvider = ({ children }) => {
     try {
       await authClient.login({
         identityProvider: 'https://identity.ic0.app/#authorize',
+        derivationOrigin: window.location.origin,
         onSuccess: () => {
           const identity = authClient.getIdentity();
           setPrincipal(identity.getPrincipal().toString());
