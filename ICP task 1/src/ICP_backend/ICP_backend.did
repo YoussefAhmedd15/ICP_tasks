@@ -4,6 +4,14 @@ type Note = record {
     content : text;
 };
 
+type TransferEvent = record {
+    id : nat64;
+    from : principal;
+    to : principal;
+    amount : nat;
+    timestamp_ns : nat64;
+};
+
 type Result = variant { Ok; Err : text };
 
 service : {
@@ -16,4 +24,5 @@ service : {
     "my_balance" : () -> (nat) query;
     "transfer" : (principal, nat) -> (Result);
     "mint_to" : (principal, nat) -> (Result);
+    "get_my_transfers" : () -> (vec TransferEvent) query;
 };

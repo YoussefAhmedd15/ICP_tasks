@@ -13,6 +13,14 @@ pub struct Note {
     pub content: String,
 }
 
+#[derive(CandidType, Deserialize, Clone)]
+pub struct TransferEvent {
+    pub id: u64,
+    pub from: Principal,
+    pub to: Principal,
+    pub amount: u128,
+    pub timestamp_ns: u64,
+}
 
 #[derive(Clone, Eq, PartialEq)]
 struct UserNoteKey {
@@ -85,11 +93,19 @@ impl Storable for Note {
     }
 }
 
+impl Storable for TransferEvent {
+    const BOUND: Bound = Bound::Unbounded;
+    fn to_bytes(&self) -> Cow<[u8]> { Cow::Owned(candid::encode_one(self).unwrap()) }
+    fn from_bytes(bytes: Cow<[u8]>) -> Self { candid::decode_one(&bytes).unwrap() }
+}
+
 thread_local! {
     static MEMORY_MANAGER: MemoryManager<DefaultMemoryImpl> = MemoryManager::init(DefaultMemoryImpl::default());
     static NOTES: RefCell<StableBTreeMap<UserNoteKey, Note, VM>> = MEMORY_MANAGER.with(|m| RefCell::new(StableBTreeMap::init(m.get(MemoryId::new(0)))));
     static NEXT_ID_CELL: RefCell<Cell<u64, VM>> = MEMORY_MANAGER.with(|m| RefCell::new(Cell::init(m.get(MemoryId::new(1)), 1).expect("init NEXT_ID cell")));
     static BALANCES: RefCell<StableBTreeMap<PrincipalKey, Amount, VM>> = MEMORY_MANAGER.with(|m| RefCell::new(StableBTreeMap::init(m.get(MemoryId::new(2)))));
+    static TRANSFERS: RefCell<StableBTreeMap<u64, TransferEvent, VM>> = MEMORY_MANAGER.with(|m| RefCell::new(StableBTreeMap::init(m.get(MemoryId::new(3)))));
+    static NEXT_TX_ID_CELL: RefCell<Cell<u64, VM>> = MEMORY_MANAGER.with(|m| RefCell::new(Cell::init(m.get(MemoryId::new(4)), 1).expect("init NEXT_TX_ID cell")));
 }
 
 fn caller() -> Principal { ic_cdk::api::caller() }
@@ -99,6 +115,15 @@ fn next_id() -> u64 {
         let mut cell = c.borrow_mut();
         let id = *cell.get();
         cell.set(id + 1).expect("increment NEXT_ID");
+        id
+    })
+}
+
+fn next_tx_id() -> u64 {
+    NEXT_TX_ID_CELL.with(|c| {
+        let mut cell = c.borrow_mut();
+        let id = *cell.get();
+        cell.set(id + 1).expect("increment NEXT_TX_ID");
         id
     })
 }
@@ -155,7 +180,6 @@ fn delete_note(id: u64) -> bool {
 #[ic_cdk::query]
 fn whoami() -> Principal { caller() }
 
-
 #[ic_cdk::query]
 fn balance_of(owner: Principal) -> u128 {
     BALANCES.with(|b| b.borrow().get(&PrincipalKey(owner)).unwrap_or(Amount(0)).0)
@@ -174,7 +198,7 @@ fn transfer(to: Principal, amount: u128) -> Result<(), String> {
     if amount == 0 { return Ok(()); }
     if from == to { return Ok(()); }
 
-    BALANCES.with(|b| {
+    let result = BALANCES.with(|b| {
         let mut map = b.borrow_mut();
         let from_key = PrincipalKey(from);
         let to_key = PrincipalKey(to);
@@ -184,7 +208,20 @@ fn transfer(to: Principal, amount: u128) -> Result<(), String> {
         let to_bal = map.get(&to_key).unwrap_or(Amount(0)).0;
         map.insert(to_key, Amount(to_bal + amount));
         Ok(())
-    })
+    });
+
+    if result.is_ok() {
+        let event = TransferEvent {
+            id: next_tx_id(),
+            from,
+            to,
+            amount,
+            timestamp_ns: ic_cdk::api::time(),
+        };
+        TRANSFERS.with(|t| { t.borrow_mut().insert(event.id, event); });
+    }
+
+    result
 }
 
 #[ic_cdk::update]
@@ -197,7 +234,28 @@ fn mint_to(to: Principal, amount: u128) -> Result<(), String> {
         let cur = map.get(&key).unwrap_or(Amount(0)).0;
         map.insert(key, Amount(cur + amount));
     });
+    let event = TransferEvent {
+        id: next_tx_id(),
+        from: caller(),
+        to,
+        amount,
+        timestamp_ns: ic_cdk::api::time(),
+    };
+    TRANSFERS.with(|t| { t.borrow_mut().insert(event.id, event); });
     Ok(())
+}
+
+#[ic_cdk::query]
+fn get_my_transfers() -> Vec<TransferEvent> {
+    let me = caller();
+    TRANSFERS.with(|t| {
+        t.borrow()
+            .range(0..=u64::MAX)
+            .filter_map(|(_, ev)| {
+                if ev.from == me || ev.to == me { Some(ev.clone()) } else { None }
+            })
+            .collect()
+    })
 }
 
 candid::export_service!();

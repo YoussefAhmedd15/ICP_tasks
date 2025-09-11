@@ -11,6 +11,17 @@ export const useAuth = () => {
   return context;
 };
 
+function getIdentityProviderUrl() {
+  const isLocalhost =
+    typeof window !== 'undefined' && /localhost|127\.0\.0\.1/.test(window.location.hostname);
+  // Local II canister (rdmx6-jaaaa-aaaaa-aaadq-cai) via hostname routing
+  if (isLocalhost) {
+    return 'http://rdmx6-jaaaa-aaaaa-aaadq-cai.localhost:4943';
+  }
+  // Hosted II on mainnet
+  return 'https://identity.ic0.app';
+}
+
 export const AuthProvider = ({ children }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [principal, setPrincipal] = useState(null);
@@ -25,10 +36,9 @@ export const AuthProvider = ({ children }) => {
     try {
       const client = await AuthClient.create();
       setAuthClient(client);
-      
+
       const isAuth = await client.isAuthenticated();
       setIsAuthenticated(isAuth);
-      
       if (isAuth) {
         const identity = client.getIdentity();
         setPrincipal(identity.getPrincipal().toString());
@@ -42,10 +52,11 @@ export const AuthProvider = ({ children }) => {
 
   const login = async () => {
     if (!authClient) return;
-
     try {
+      const identityProviderUrl = getIdentityProviderUrl();
       await authClient.login({
-        identityProvider: 'https://identity.ic0.app/#authorize',
+        identityProvider: identityProviderUrl,
+        windowOpenerFeatures: 'left=100,top=100,width=480,height=720,toolbar=0,location=0,menubar=0,scrollbars=1,resizable=1',
         derivationOrigin: window.location.origin,
         onSuccess: () => {
           const identity = authClient.getIdentity();
@@ -62,10 +73,10 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = async () => {
-    if (!authClient) return;
-
     try {
-      await authClient.logout();
+      if (authClient) {
+        await authClient.logout();
+      }
       setIsAuthenticated(false);
       setPrincipal(null);
     } catch (error) {

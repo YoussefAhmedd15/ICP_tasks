@@ -15,15 +15,19 @@ function App() {
   const [toPrincipal, setToPrincipal] = useState('');
   const [amount, setAmount] = useState('');
   const [backend, setBackend] = useState(null);
+  const [transfers, setTransfers] = useState([]);
 
   useEffect(() => {
     const init = async () => {
-      if (!isAuthenticated || !authClient) {
+      if (!isAuthenticated) {
         setBackend(null);
         return;
       }
-      const identity = authClient.getIdentity();
-      // Use same-origin agent in dev to satisfy CSP (rely on Vite proxy /api->4943)
+      const identity = authClient ? authClient.getIdentity() : undefined;
+      if (!identity) {
+        setBackend(null);
+        return;
+      }
       const agent = new HttpAgent({ identity });
       try { await agent.fetchRootKey(); } catch (e) { console.warn('fetchRootKey failed', e); }
       const actor = createActor(canisterId, { agent });
@@ -32,7 +36,6 @@ function App() {
     init();
   }, [isAuthenticated, authClient]);
 
-  
   const loadNotes = async () => {
     try {
       if (!backend) return;
@@ -47,7 +50,6 @@ function App() {
     try {
       if (!backend) return;
       const bal = await backend.my_balance();
-      // Ensure robust string conversion for bigint/candid nat types
       const balStr = (bal !== undefined && bal !== null)
         ? (typeof bal === 'bigint' ? bal.toString() : (bal.toString ? bal.toString() : String(bal)))
         : '0';
@@ -57,7 +59,17 @@ function App() {
     }
   };
 
-  
+  const loadTransfers = async () => {
+    try {
+      if (!backend) return;
+      const events = await backend.get_my_transfers();
+      const list = (events || []).slice().sort((a, b) => Number(b.timestamp_ns) - Number(a.timestamp_ns));
+      setTransfers(list);
+    } catch (e) {
+      console.error('Error loading transfers:', e);
+    }
+  };
+
   const createNote = async (e) => {
     e.preventDefault();
     if (!title.trim() || !content.trim()) return;
@@ -73,7 +85,6 @@ function App() {
     }
   };
 
-  
   const updateNote = async (id) => {
     if (!title.trim() || !content.trim()) return;
     
@@ -89,7 +100,6 @@ function App() {
     }
   };
 
-  
   const deleteNote = async (id) => {
     try {
       if (!backend) return;
@@ -100,14 +110,12 @@ function App() {
     }
   };
 
-  
   const startEdit = (note) => {
     setTitle(note.title);
     setContent(note.content);
     setEditingId(note.id);
   };
 
-  
   const cancelEdit = () => {
     setTitle('');
     setContent('');
@@ -118,9 +126,11 @@ function App() {
     if (isAuthenticated && backend) {
       loadNotes();
       loadBalance();
+      loadTransfers();
     } else {
       setNotes([]);
       setBalance('0');
+      setTransfers([]);
     }
   }, [isAuthenticated, backend]);
 
@@ -138,7 +148,7 @@ function App() {
         <h1>📝 Note Taking dApp</h1>
         <div className="auth-container">
           <h2>Welcome to Your Secure Note-Taking App</h2>
-          <p>Please authenticate with Internet Identity to access your notes.</p>
+          <p>Authenticate using Internet Identity.</p>
           <button onClick={login} className="login-button">
             🔐 Login with Internet Identity
           </button>
@@ -177,6 +187,7 @@ function App() {
             onChange={(e) => setAmount(e.target.value)}
           />
           <button
+            className="send-button"
             onClick={async () => {
               try {
                 if (!toPrincipal || !amount || !backend) return;
@@ -185,6 +196,7 @@ function App() {
                 setAmount('');
                 setToPrincipal('');
                 loadBalance();
+                loadTransfers();
               } catch (e) {
                 console.error('Transfer failed:', e);
               }
@@ -215,7 +227,7 @@ function App() {
                 <button type="button" onClick={() => updateNote(editingId)}>
                   Update Note
                 </button>
-                <button type="button" onClick={cancelEdit}>
+                <button type="button" className="button-secondary" onClick={cancelEdit}>
                   Cancel
                 </button>
               </>
@@ -226,7 +238,25 @@ function App() {
         </form>
       </div>
 
-      
+      <div className="history-container">
+        <h2>Transfer History</h2>
+        {transfers.length === 0 ? (
+          <p className="muted">No transfers yet.</p>
+        ) : (
+          <div className="transfers-list">
+            {transfers.map((ev) => (
+              <div key={String(ev.id)} className="transfer-row">
+                <div><strong>ID:</strong> <span className="pill">{String(ev.id)}</span></div>
+                <div><strong>From:</strong> <span className="pill">{ev.from?.toText ? ev.from.toText() : String(ev.from)}</span></div>
+                <div><strong>To:</strong> <span className="pill">{ev.to?.toText ? ev.to.toText() : String(ev.to)}</span></div>
+                <div><strong>Amount:</strong> <span className="amount">{String(ev.amount)}</span></div>
+                <div><strong>Time:</strong> <span className="muted">{new Date(Number(ev.timestamp_ns) / 1_000_000).toLocaleString()}</span></div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
       <div className="notes-container">
         <h2>Your Notes</h2>
         {notes.length === 0 ? (
